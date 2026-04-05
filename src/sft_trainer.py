@@ -21,24 +21,19 @@ class SFTVisualizerCallback(TrainerCallback):
         self.sample_every = sample_every
 
     def on_log(self, args, state, control, logs=None, **kwargs):
-        # Chỉ in ra mỗi 'sample_every' bước để không làm chậm quá trình train
         if state.global_step % self.sample_every == 0 and state.global_step > 0:
             model = kwargs['model']
-            model.eval() # Chuyển sang chế độ eval để generate
+            model.eval()
             
-            # 1. Lấy một mẫu ngẫu nhiên từ tập train
             idx = random.randint(0, len(self.dataset) - 1)
             item = self.dataset[idx]
             
-            # Messages có cấu trúc: [System, User, Assistant]
             messages = item["messages"]
-            ground_truth = messages[2]["content"][0]["text"] # Nội dung của Assistant
+            ground_truth = messages[2]["content"][0]["text"]
             
-            # 2. Chuẩn bị Input cho mô hình (chỉ lấy phần System + User)
             input_messages = messages[:2] 
             text = self.processor.apply_chat_template(input_messages, tokenize=False, add_generation_prompt=True)
             
-            # Qwen2-VL cần xử lý ảnh kèm theo
             image_inputs = item.get("images", [None])[0]
             
             inputs = self.processor(
@@ -48,10 +43,8 @@ class SFTVisualizerCallback(TrainerCallback):
                 return_tensors="pt",
             ).to(model.device)
 
-            # 3. Model sinh câu trả lời
             with torch.no_grad():
                 generated_ids = model.generate(**inputs, max_new_tokens=128)
-                # Cắt bỏ phần prompt cũ trong kết quả
                 generated_ids_trimmed = [
                     out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
                 ]
@@ -59,30 +52,28 @@ class SFTVisualizerCallback(TrainerCallback):
                     generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
                 )[0]
 
-            # 4. In kết quả ra console
-            print("\n" + "✨" * 30)
+            print("\n" + "-" * 30)
             print(f"📊 [SFT DEBUG] STEP: {state.global_step}")
             print(f"✅ [GROUND TRUTH]:\n{ground_truth}")
             print(f"🤖 [MODEL OUTPUT]:\n{output_text}")
             print("✨" * 30 + "\n")
             
-            model.train() # Chuyển lại về chế độ train
+            model.train()
 
 def train_sft_baseline(model_dir: str, train_data, output_dir: str):
     processor = AutoProcessor.from_pretrained(model_dir)
     
-    # Giới hạn Pixel để tránh lỗi Mismatch Token
     processor.image_processor.min_pixels = 256 * 28 * 28
     processor.image_processor.max_pixels = 512 * 28 * 28 
 
     peft_model = apply_lora_to_quantized_model(model_dir)
-    sft_dataset = prepare_minicap_for_sft(train_data) #
+    sft_dataset = prepare_minicap_for_sft(train_data) 
 
     training_args = SFTConfig(
         output_dir=output_dir,
         dataset_text_field="messages", 
         dataset_kwargs={"skip_prepare_dataset": True},
-        max_length=2048, # Tăng max_length để chứa đủ ảnh
+        max_length=2048,
         learning_rate=2e-5,          
         lr_scheduler_type="cosine",
         logging_steps=1,           
@@ -95,7 +86,6 @@ def train_sft_baseline(model_dir: str, train_data, output_dir: str):
         report_to="none",
     )
 
-    # Thêm Callback Visualizer vào danh sách
     visualizer = SFTVisualizerCallback(processor, sft_dataset, sample_every=10)
 
     trainer = SFTTrainer(
@@ -103,7 +93,7 @@ def train_sft_baseline(model_dir: str, train_data, output_dir: str):
         processing_class=processor,
         args=training_args,
         train_dataset=sft_dataset,
-        callbacks=[visualizer], #
+        callbacks=[visualizer], 
     )
 
     trainer.train()

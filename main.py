@@ -75,9 +75,15 @@ def run_rl_training(quant_model_dir, sft_dataset, grpo_dataset):
     sft_output_dir = "./sft_baseline_checkpoints"
     grpo_output_dir = "./r3_quant_checkpoints"
     
-    print("\n--- 5. Bắt đầu quá trình Supervised Fine-Tuning (SFT) với Mini CoT ---")
-    train_sft_baseline(quant_model_dir, sft_dataset, sft_output_dir)
-    print(f"\n[SUCCESS] Hoàn tất quá trình huấn luyện SFT! Model được lưu tại: {sft_output_dir}")
+    checkpoint_exists = os.path.exists(sft_output_dir) and \
+                        os.path.exists(os.path.join(sft_output_dir, "adapter_config.json"))
+
+    if checkpoint_exists:
+        print(f"\n--- [SKIP] Đã tìm thấy SFT Checkpoint tại {sft_output_dir}. Bỏ qua bước train SFT. ---")
+    else:
+        print("\n--- 5. Bắt đầu quá trình Supervised Fine-Tuning (SFT) với Mini CoT ---")
+        train_sft_baseline(quant_model_dir, sft_dataset, sft_output_dir)
+        print(f"\n[SUCCESS] Hoàn tất quá trình huấn luyện SFT! Model được lưu tại: {sft_output_dir}")
     
     print("\n--- 6. Bắt đầu quá trình huấn luyện RL (GRPO) tiếp nối bước SFT ---")
     train_r3_quant_grpo(quant_model_dir, grpo_dataset, grpo_output_dir, sft_lora_dir=sft_output_dir)
