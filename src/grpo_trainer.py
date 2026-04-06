@@ -93,7 +93,7 @@ def train_r3_quant_grpo(model_dir: str, train_data, output_dir: str, sft_lora_di
         lr_scheduler_type="cosine",
         
         logging_steps=1,           
-        max_steps=500,
+        max_steps=500, #hehehee
         
         per_device_train_batch_size=1,
         gradient_accumulation_steps=16,       
