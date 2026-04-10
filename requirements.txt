@@ -1,12 +1,26 @@
-torch
-datasets
+# --- Hugging Face Ecosystem ---
+transformers>=4.37.0
+accelerate>=0.27.0
+datasets>=2.16.0
 huggingface_hub
-transformers 
-accelerate 
-autoawq 
-qwen-vl-utils
-optimum
-gptqmodel
-peft
-trl
-bitsandbytes
+
+# --- Quantization & Optimization ---
+# Lưu ý: auto-gptq cần thiết cho bước Quantization (LlavaGPTQQuantizer)
+optimum>=1.16.0
+bitsandbytes>=0.42.0
+
+# --- Fine-tuning & Reinforcement Learning ---
+# PEFT cho LoRA và TRL cho thuật toán GRPO
+peft>=0.8.0
+trl>=0.8.1
+
+# --- Vision & Utilities ---
+Pillow
+tqdm
+pandas
+pyarrow
+fastparquet
+
+# --- VLM Specific (Dành cho Llava) ---
+# Thư viện hỗ trợ tính toán attention nhanh (nếu GPU hỗ trợ Ampere+)
+# flash-attn  # Nên cài đặt thủ công để tránh lỗi build: pip install flash-attn --no-build-isolation
