@@ -9,7 +9,7 @@ from transformers import AutoProcessor, LlavaForConditionalGeneration, BitsAndBy
 from datasets import load_dataset, Dataset
 
 class LlavaDeepEvaluator:
-    def __init__(self, model_path, data_path, num_samples=20, mode="fp16"):
+    def __init__(self, model_path, data_path, num_samples=500, mode="fp16"):
         self.model_path = model_path
         self.data_path = data_path
         self.num_samples = num_samples
