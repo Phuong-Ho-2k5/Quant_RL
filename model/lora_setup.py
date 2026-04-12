@@ -11,13 +11,22 @@ def get_t4_bnb_config():
     )
 
 def apply_lora_for_llava(model_path):
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.float32,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True
+    )
+    
     model = LlavaForConditionalGeneration.from_pretrained(
         model_path,
-        quantization_config=get_t4_bnb_config(),
-        torch_dtype=torch.float16,
+        quantization_config=bnb_config,
+        torch_dtype=torch.float32,
         device_map="auto",
     )
+    
     model = prepare_model_for_kbit_training(model)
+    
     
     target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
     lora_config = LoraConfig(

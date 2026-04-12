@@ -28,6 +28,9 @@ def logging_reward_func(prompts, completions, **kwargs):
     return [0.0] * len(prompts)
 
 def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: str = None):
+    # Ép buộc torch về fp32 để tránh mixed precision
+    torch.set_default_dtype(torch.float32)
+    
     # 1. Load Processor chuẩn Llava
     processor = AutoProcessor.from_pretrained(model_dir)
     processor.tokenizer.padding_side = "left"
@@ -39,12 +42,19 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
     else:
         print("🆕 Khởi tạo Adapter mới cho Llava-7B.")
         peft_model = apply_lora_for_llava(model_dir)
+    
+    # Force model về fp32 (gradients sẽ ở fp32, parameters quantized giữ nguyên)
+    for param in peft_model.parameters():
+        if param.is_floating_point():
+            param.data = param.data.float()
 
     # 3. Quản lý Token đặc biệt
     if peft_model.generation_config.pad_token_id is None:
         peft_model.generation_config.pad_token_id = processor.tokenizer.pad_token_id
 
-    # 4. Chuẩn bị Dataset (Sử dụng format USER: <image>\n{Q} ASSISTANT:)
+    peft_model.config.use_cache = False
+
+    # 4. Chuẩn bị Dataset (Sử dụng format USER: <tr>\n{Q} ASSISTANT:)
     grpo_dataset = prepare_scienceqa_for_grpo(train_data)
 
     def decode_and_sanitize_data(batch):
@@ -63,13 +73,17 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
                         img = Image.open(io.BytesIO(img['bytes'])).convert("RGB")
                     new_batch["images"].append([img])
                 
-        # Giữ lại ground_truth cho Reward Func
         if "ground_truth" in batch:
             new_batch["ground_truth"] = batch["ground_truth"]
             
         return new_batch
 
     grpo_dataset.set_transform(decode_and_sanitize_data)
+
+    accelerator = Accelerator(
+        mixed_precision="no",
+        gradient_accumulation_steps=16
+    )
 
     # 5. Cấu hình Training (Tối ưu cho 7B Model)
     training_args = GRPOConfig(
@@ -87,19 +101,13 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         temperature=0.9,
         max_completion_length=512,
         beta=0.04,
-        fp16=True,
+        fp16=False,
         bf16=False,
         tf32=False,
         remove_unused_columns=False,
-        report_to="none"
-    )
-
-    training_args.fp16_backend = "automatic"
-
-    accelerator = Accelerator(
-        fp16 = True,
-        mixed_precision = "fp16",
-        gradient_accumulation_steps = training_args.gradient_accumulation_steps
+        report_to="none",
+        dataloader_pin_memory=False,
+        skip_memory_metrics=True,
     )
 
     trainer = GRPOTrainer(
@@ -108,9 +116,10 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         reward_funcs=[format_reward_func, accuracy_reward_func, logging_reward_func],
         args=training_args,
         train_dataset=grpo_dataset,
-        accelerator=accelerator
     )
+    trainer.accelerator = accelerator
 
+    print("--- Bắt đầu huấn luyện GRPO cho Llava-7B ---")
     trainer.train()
     
     trainer.save_model(output_dir)
