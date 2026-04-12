@@ -94,7 +94,7 @@ def run_comparison():
             print(f"⚠️ Bỏ qua {ckpt['name']} vì không tìm thấy đường dẫn.")
             continue
             
-        evaluator = LlavaDeepEvaluator(ckpt["path"], DATA_PATH, num_samples=20, mode=ckpt["mode"])
+        evaluator = LlavaDeepEvaluator(ckpt["path"], DATA_PATH, num_samples=500, mode=ckpt["mode"])
         acc = evaluator.evaluate()
         final_results[ckpt["name"]] = acc
         
