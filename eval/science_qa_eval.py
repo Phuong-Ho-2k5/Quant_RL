@@ -463,7 +463,7 @@ def run_comparison():
             log_filename = f"results_{ckpt['name'].replace(' ', '_').replace('.', '')}.txt"
             acc, results, wrong = evaluator.evaluate_with_logging(
                 log_file=log_filename, 
-                print_samples=3,  # In 3 sample đầu
+                print_samples=500,  # In 500 sample đầu
                 save_json=True
             )
             
