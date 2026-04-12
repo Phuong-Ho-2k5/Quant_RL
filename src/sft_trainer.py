@@ -66,6 +66,8 @@ def train_llava_sft(model_dir: str, train_data, output_dir: str):
     # 2. Apply LoRA cho quantized model (Llava-7B)
     peft_model = apply_lora_for_llava(model_dir)
 
+    peft_model = peft_model.to(torch.float16)  # Đảm bảo model ở dtype phù hợp với GPU của bạn
+
     # 3. Chuẩn bị dataset (phải map sang format USER/ASSISTANT của Llava)
     sft_dataset = prepare_minicap_for_sft(train_data) 
 
@@ -82,11 +84,13 @@ def train_llava_sft(model_dir: str, train_data, output_dir: str):
         gradient_checkpointing=True, 
         fp16=True,   
         bf16=False,
-        tf32=False,              
+        tf32=False, 
+        dataloader_pin_memory=False,             
         remove_unused_columns=False, 
         report_to="none",
     )
 
+    training_args.fp16_backend = "automatic" 
     visualizer = SFTVisualizerCallback(processor, sft_dataset, sample_every=25)
 
     trainer = SFTTrainer(
