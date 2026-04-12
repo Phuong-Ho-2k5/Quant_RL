@@ -1,14 +1,19 @@
 import torch
-from transformers import LlavaForConditionalGeneration, AutoTokenizer
+from transformers import LlavaForConditionalGeneration, AutoTokenizer, BitsAndBytesConfig
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, PeftModel
 
 def apply_lora_for_llava(model_path):
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_quant_type="nf4"
+    )
+
     model = LlavaForConditionalGeneration.from_pretrained(
         model_path,
+        quantization_config=bnb_config,
         torch_dtype=torch.float16,
         device_map="auto",
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_quant_type="nf4",
     )
 
     model  = prepare_model_for_kbit_training(model)
