@@ -88,6 +88,7 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         
         beta=0.04,
         fp16=True,
+        bf16=False,
         remove_unused_columns=False,
         report_to="none"
     )
