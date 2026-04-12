@@ -80,7 +80,7 @@ def train_llava_sft(model_dir: str, train_data, output_dir: str):
         per_device_train_batch_size=1, 
         gradient_accumulation_steps=8,
         gradient_checkpointing=True, 
-        bf16=True,                   
+        fp16=True,                   
         remove_unused_columns=False, 
         report_to="none",
     )
