@@ -40,8 +40,6 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         print("🆕 Khởi tạo Adapter mới cho Llava-7B.")
         peft_model = apply_lora_for_llava(model_dir)
 
-    peft_model = peft_model.to(torch.float16) 
-
     # 3. Quản lý Token đặc biệt
     if peft_model.generation_config.pad_token_id is None:
         peft_model.generation_config.pad_token_id = processor.tokenizer.pad_token_id
@@ -97,7 +95,7 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
     )
 
     training_args.fp16_backend = "automatic"
-    
+
     accelerator = Accelerator(
         fp16 = True,
         mixed_precision = "fp16",

@@ -17,7 +17,6 @@ def apply_lora_for_llava(model_path):
         torch_dtype=torch.float16,
         device_map="auto",
     )
-    model = model.to(torch.float16)  # Đảm bảo model ở dtype phù hợp với GPU của bạn
     model = prepare_model_for_kbit_training(model)
     
     target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
