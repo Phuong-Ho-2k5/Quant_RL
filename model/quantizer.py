@@ -4,12 +4,9 @@ import torch
 from transformers import (
     AutoProcessor, 
     LlavaForConditionalGeneration,
-    GPTQConfig, 
+    BitsAndBytesConfig, 
     AutoConfig
 )
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from data.dataset_loader import ScienceQALocalLoader
 
 class LlavaGPTQQuantizer:
     def __init__(self, base_model_path, save_path, data_path):
@@ -17,47 +14,43 @@ class LlavaGPTQQuantizer:
         self.save_path = save_path
         self.data_path = data_path
 
-    def get_calibration_data(self, test_size=8):
-        loader = ScienceQALocalLoader(self.data_path, subset_size=test_size)
-        df = loader.preprocess_for_r3_quant()
-        return [
-            f"USER: <image>\nQuestion: {row['question']}\nChoices: {row.get('choices', '')}\nASSISTANT: {row['reasoning']}" 
-            for _, row in df.iterrows()
-        ]
-
     def quantize_and_save(self, bits=4):
-        calib_dataset = self.get_calibration_data(test_size=128)
+        # Sử dụng BitsAndBytes thay vì GPTQ để tránh lỗi biên dịch thư viện
+        print(f"--- Đang cấu hình nén 4-bit (NF4) cho Llava-7B... ---")
         
-        gptq_config = GPTQConfig(
-            bits=bits,
-            dataset=calib_dataset,
-            tokenizer=self.base_model_path, 
-            use_exllama=False,            
-            desc_act=False,
-            sym=True
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",          # Kỹ thuật nén 4-bit chất lượng cao
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_use_double_quant=True,     # Tiết kiệm RAM hơn nữa
         )
 
         config = AutoConfig.from_pretrained(self.base_model_path)
-        config.use_cache = False # Tắt cache khi quantize
+        config.use_cache = False 
 
         try:
-            print(f"--- Đang nén Llava 7B sang {bits}-bit... ---")
+            print(f"--- Đang nạp và nén model... (Quá trình này tốn khoảng 5-10 phút) ---")
+            # Nạp model với cấu hình nén
             model = LlavaForConditionalGeneration.from_pretrained(
                 self.base_model_path,
-                config=config,
-                quantization_config=gptq_config,
+                quantization_config=bnb_config,
                 device_map="auto",
                 torch_dtype=torch.float16,
                 low_cpu_mem_usage=True
             )
 
+            # Lưu cấu hình và trọng số đã nén
             os.makedirs(self.save_path, exist_ok=True)
             model.save_pretrained(self.save_path)
             
+            # Lưu kèm Processor (cần thiết cho Llava)
             processor = AutoProcessor.from_pretrained(self.base_model_path)
             processor.save_pretrained(self.save_path)
-            print(f"--- Lưu model nén thành công tại: {self.save_path} ---")
+            
+            print(f"--- [SUCCESS] Đã lưu model nén tại: {self.save_path} ---")
             
         except Exception as e:
-            print(f"--- Lỗi khi quantize: {e} ---")
+            print(f"--- Lỗi nghiêm trọng: {e} ---")
+            import traceback
+            traceback.print_exc()
             sys.exit(1)
