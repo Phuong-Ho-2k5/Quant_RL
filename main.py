@@ -26,7 +26,7 @@ def download_data():
     target_path = "./data/science_qa/validation-00000-of-00001-6c7328ff6c84284c.parquet"
     if not os.path.exists(target_path):
         print("Đang tải dataset từ Hugging Face...")
-        dataset = load_dataset("derek-thomas/ScienceQA", split="validation")
+        dataset = load_dataset("derek-thomas/ScienceQA", split="validation", cache_dir="./data/cache")
         dataset.to_parquet(target_path)
         print(f"Đã lưu dataset tại: {target_path}")
     else:

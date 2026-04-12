@@ -75,7 +75,7 @@ def run_comparison():
     DATA_PATH = "./data/science_qa/test-00000-of-00001-f0e719df791966ff.parquet"
     if not os.path.exists(DATA_PATH):
         print(f"Đang tải dataset ScienceQA... (khoảng 100MB)")
-        dataset = load_dataset("science_qa", split="test")
+        dataset = load_dataset("derek-thomas/ScienceQA", split="test", cache_dir="./data/cache")
         dataset.to_parquet(DATA_PATH)
         print(f"Đã lưu dataset tại: {DATA_PATH}")
     else:
