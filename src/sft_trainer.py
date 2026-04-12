@@ -91,7 +91,7 @@ def train_llava_sft(model_dir: str, train_data, output_dir: str):
         model=peft_model,
         processing_class=processor,
         args=training_args,
-        max_seq_length=1024,
+        # max_seq_length=1024,
         train_dataset=sft_dataset,
         callbacks=[visualizer], 
     )
