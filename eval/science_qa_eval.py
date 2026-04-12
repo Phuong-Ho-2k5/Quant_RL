@@ -75,6 +75,7 @@ def run_comparison():
     checkpoints = [
         {"name": "1. GỐC (Chưa nén)", "path": "./weights/llava-1.5-7b-hf", "mode": "fp16"},
         {"name": "2. NÉN (Baseline)", "path": "./weights/llava-1.5-7b-hf-GPTQ-Int4", "mode": "4bit"},
+        
         {"name": "3. SAU GRPO (Final)", "path": "./r3_quant_checkpoints", "mode": "4bit"}
     ]
     
