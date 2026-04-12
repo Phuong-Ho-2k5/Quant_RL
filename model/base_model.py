@@ -27,7 +27,7 @@ class ModelDownloader:
    
         model = LlavaForConditionalGeneration.from_pretrained(
             self.local_dir,
-            torch_dtype=torch.bfloat16,
+            torch_dtype=torch.float16,
             device_map="auto",
             low_cpu_mem_usage=True
         )

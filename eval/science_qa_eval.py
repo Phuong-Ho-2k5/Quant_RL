@@ -28,7 +28,7 @@ class LlavaDeepEvaluator:
             load_args["torch_dtype"] = torch.float16
         else:
             # Dành cho model gốc (FP16/BF16)
-            load_args["torch_dtype"] = torch.bfloat16
+            load_args["torch_dtype"] = torch.float16
 
         self.model = LlavaForConditionalGeneration.from_pretrained(model_path, **load_args)
         self.model.eval()
