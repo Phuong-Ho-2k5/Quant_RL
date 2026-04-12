@@ -7,6 +7,8 @@ def apply_lora_for_llava(model_path):
         model_path,
         torch_dtype=torch.float16,
         device_map="auto",
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_quant_type="nf4",
     )
 
     model  = prepare_model_for_kbit_training(model)
