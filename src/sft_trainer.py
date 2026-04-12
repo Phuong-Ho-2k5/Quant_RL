@@ -10,7 +10,7 @@ from peft import PeftModel
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Đảm bảo dùng hàm apply_lora dành cho Llava (target_modules: q_proj, v_proj,...)
-from model.lora_setup import apply_lora_to_llava 
+from model.lora_setup import apply_lora_for_llava 
 from src.utils import prepare_minicap_for_sft
 
 class SFTVisualizerCallback(TrainerCallback):
@@ -64,7 +64,7 @@ def train_llava_sft(model_dir: str, train_data, output_dir: str):
     # Llava 1.5 thường dùng size 336x336, processor sẽ tự resize
     
     # 2. Apply LoRA cho quantized model (Llava-7B)
-    peft_model = apply_lora_to_llava(model_dir)
+    peft_model = apply_lora_for_llava(model_dir)
 
     # 3. Chuẩn bị dataset (phải map sang format USER/ASSISTANT của Llava)
     sft_dataset = prepare_minicap_for_sft(train_data) 
