@@ -6,6 +6,7 @@ from trl import SFTConfig, SFTTrainer
 from transformers import AutoProcessor, TrainerCallback, LlavaForConditionalGeneration
 from datasets import load_dataset
 from peft import PeftModel
+from accelerate import Accelerator
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -92,14 +93,19 @@ def train_llava_sft(model_dir: str, train_data, output_dir: str):
 
     training_args.fp16_backend = "automatic" 
     visualizer = SFTVisualizerCallback(processor, sft_dataset, sample_every=25)
-
+    accelerator = Accelerator(
+        fp16 = True,
+        mixed_precision = "fp16",
+        gradient_accumulation_steps = training_args.gradient_accumulation_steps
+    )
     trainer = SFTTrainer(
         model=peft_model,
         processing_class=processor,
         args=training_args,
         # max_seq_length=1024,
         train_dataset=sft_dataset,
-        callbacks=[visualizer], 
+        callbacks=[visualizer],
+        accelerator=accelerator
     )
 
     print("--- Bắt đầu huấn luyện SFT cho Llava-7B ---")

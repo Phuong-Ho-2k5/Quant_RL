@@ -6,6 +6,7 @@ from PIL import Image
 from trl import GRPOConfig, GRPOTrainer
 from transformers import AutoProcessor, LlavaForConditionalGeneration
 from datasets import load_dataset
+from accelerate import Accelerator
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -38,6 +39,8 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
     else:
         print("🆕 Khởi tạo Adapter mới cho Llava-7B.")
         peft_model = apply_lora_for_llava(model_dir)
+
+    peft_model = peft_model.to(torch.float16) 
 
     # 3. Quản lý Token đặc biệt
     if peft_model.generation_config.pad_token_id is None:
@@ -93,12 +96,21 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         report_to="none"
     )
 
+    training_args.fp16_backend = "automatic"
+    
+    accelerator = Accelerator(
+        fp16 = True,
+        mixed_precision = "fp16",
+        gradient_accumulation_steps = training_args.gradient_accumulation_steps
+    )
+
     trainer = GRPOTrainer(
         model=peft_model,
         processing_class=processor,
         reward_funcs=[format_reward_func, accuracy_reward_func, logging_reward_func],
         args=training_args,
         train_dataset=grpo_dataset,
+        accelerator=accelerator
     )
 
     trainer.train()
