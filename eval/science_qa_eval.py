@@ -6,6 +6,7 @@ import os
 from PIL import Image
 from tqdm import tqdm
 from transformers import AutoProcessor, LlavaForConditionalGeneration, BitsAndBytesConfig
+from datasets import load_dataset, Dataset
 
 class LlavaDeepEvaluator:
     def __init__(self, model_path, data_path, num_samples=20, mode="fp16"):
@@ -72,6 +73,13 @@ class LlavaDeepEvaluator:
 # --- SCRIPT CHẠY SO SÁNH 3 GIAI ĐOẠN ---
 def run_comparison():
     DATA_PATH = "./data/science_qa/test-00000-of-00001-f0e719df791966ff.parquet"
+    if not os.path.exists(DATA_PATH):
+        print(f"Đang tải dataset ScienceQA... (khoảng 100MB)")
+        dataset = load_dataset("science_qa", split="test")
+        dataset.to_parquet(DATA_PATH)
+        print(f"Đã lưu dataset tại: {DATA_PATH}")
+    else:
+        print(f"Đã tìm thấy dataset tại: {DATA_PATH}, bỏ qua bước tải.")
     checkpoints = [
         {"name": "1. GỐC (Chưa nén)", "path": "./weights/llava-1.5-7b-hf", "mode": "fp16"},
         {"name": "2. NÉN (Baseline)", "path": "./weights/llava-1.5-7b-hf-GPTQ-Int4", "mode": "4bit"},
