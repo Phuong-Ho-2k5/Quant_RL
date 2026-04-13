@@ -108,7 +108,7 @@ def main():
     
     # Chuẩn bị dữ liệu
     grpo_dataset = download_data()
-    sft_dataset = download_data()  # Sử dụng lại dataset ScienceQA cho SFT (có thể thay bằng Mini CoT 8k nếu muốn)
+    sft_dataset = download_sft_data()
     dataset_path = "./data/science_qa/validation-00000-of-00001-6c7328ff6c84284c.parquet"
     
     # Tải và Nén
