@@ -31,12 +31,20 @@ def download_data():
         print(f"Đã lưu dataset tại: {target_path}")
     else:
         print(f"Dataset đã tồn tại tại {target_path}, đang load...")
-        dataset = load_dataset("parquet", data_files=target_path, split="train")
+        dataset = load_dataset("parquet", data_files=target_path)
     return dataset
 
 def download_sft_data():
     print("\n--- 2.5 Đang tải Dataset Mini CoT 8k (Pha mồi SFT) ---")
-    sft_dataset = load_dataset("luodian/mini_cot_8k_verified", split="train")
+    target_path = "./data/mini_cot_8k_verified"
+    if not os.path.exists("./data/mini_cot_8k_verified/train-00000-of-00001.parquet"):
+        print("Đang tải dataset Mini CoT 8k từ Hugging Face...")
+        sft_dataset = load_dataset("luodian/mini_cot_8k_verified", split="train")
+        sft_dataset.save_to_disk("./data/mini_cot_8k_verified")
+        print("Đã lưu dataset Mini CoT 8k tại: ./data/mini_cot_8k_verified")
+    else:
+        print("Dataset Mini CoT 8k đã tồn tại, đang load...")
+        sft_dataset = load_dataset("parquet", data_files=target_path)
     return sft_dataset
 
 def download_model(model_id):
