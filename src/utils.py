@@ -44,20 +44,12 @@ def prepare_minicap_for_sft(raw_dataset, max_samples=None):
             "images": [item["image"]] 
         }
 
-    column_names = raw_dataset.column_names
-
     dataset = raw_dataset.filter(lambda x: x.get("image") is not None)
     
     if max_samples:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
     
-    # QUAN TRỌNG: remove_columns=column_names
-    dataset = dataset.map(
-        format_sft_row, 
-        num_proc=4,
-        remove_columns=column_names, 
-        desc="Formatting SFT dataset"
-    )
+    dataset = dataset.map(format_sft_row, num_proc=4)
     return dataset
 
 def prepare_scienceqa_for_grpo(raw_dataset, max_samples=None):

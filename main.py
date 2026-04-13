@@ -31,7 +31,7 @@ def download_data():
         print(f"Đã lưu dataset tại: {target_path}")
     else:
         print(f"Dataset đã tồn tại tại {target_path}, đang load...")
-        dataset = load_dataset("parquet", data_files=target_path)
+        dataset = load_dataset("parquet", data_files=target_path, split="train")
     return dataset
 
 def download_sft_data():
@@ -44,7 +44,7 @@ def download_sft_data():
         print("Đã lưu dataset Mini CoT 8k tại: ./data/mini_cot_8k_verified")
     else:
         print("Dataset Mini CoT 8k đã tồn tại, đang load...")
-        sft_dataset = load_dataset("parquet", data_files=target_path)
+        sft_dataset = load_dataset("parquet", data_files=target_path, split="train")
     return sft_dataset
 
 def download_model(model_id):
