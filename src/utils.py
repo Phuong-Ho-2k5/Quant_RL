@@ -24,7 +24,7 @@ def prepare_minicap_for_sft(raw_dataset, max_samples=None):
         "thinks step-by-step and encloses the reasoning in <think> tags "
         "and the final answer in <answer> tags."
     )
-
+    old_column_names = raw_dataset.column_names 
     def format_sft_row(item):
         # Format chuẩn Llava: USER: <image>\n{Question} ASSISTANT: <think>{Reasoning}</think><answer>{Answer}</answer>
         question_text = build_scienceqa_prompt(item.get("question", ""), item.get("choices", []))
@@ -45,11 +45,10 @@ def prepare_minicap_for_sft(raw_dataset, max_samples=None):
         }
 
     dataset = raw_dataset.filter(lambda x: x.get("image") is not None)
-    
     if max_samples:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
-    
-    dataset = dataset.map(format_sft_row, num_proc=4)
+
+    dataset = dataset.map(format_sft_row, num_proc=1, remove_columns=old_column_names)
     return dataset
 
 def prepare_scienceqa_for_grpo(raw_dataset, max_samples=None):

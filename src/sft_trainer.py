@@ -25,12 +25,16 @@ class SFTVisualizerCallback(TrainerCallback):
             idx = random.randint(0, len(self.dataset) - 1)
             item = self.dataset[idx]
             
-            messages = item["messages"]
-            ground_truth = messages[2]["content"][0]["text"]
-            
-            prompt_text = f"USER: <td>\n{messages[1]['content'][1]['text']}\nASSISTANT:"
+            full_text = item["text"]
             image = item["images"][0]
-            
+
+            if "ASSISTANT:" in full_text:
+                prompt_text = full_text.split("ASSISTANT:")[0] + "ASSISTANT:"
+                ground_truth = full_text.split("ASSISTANT:")[1].strip()
+            else:
+                prompt_text = full_text[:100]
+                ground_truth = "N/A"
+                
             inputs = self.processor(text=prompt_text, images=image, return_tensors="pt").to(model.device)
 
             with torch.no_grad():
