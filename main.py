@@ -36,7 +36,7 @@ def download_data():
 
 def download_sft_data():
     print("\n--- 2.5 Đang tải Dataset Mini CoT 8k (Pha mồi SFT) ---")
-    target_path = "./data/mini_cot_8k_verified"
+    target_path = "./data/mini_cot_8k_verified/train-00000-of-00001.parquet"
     if not os.path.exists("./data/mini_cot_8k_verified/train-00000-of-00001.parquet"):
         print("Đang tải dataset Mini CoT 8k từ Hugging Face...")
         sft_dataset = load_dataset("luodian/mini_cot_8k_verified", split="train")
