@@ -52,5 +52,5 @@ def load_existing_lora_for_quantized_model(base_model_dir, lora_dir):
     )
 
     peft_model = get_peft_model(base_model, lora_config)
-    peft_model.load_adapter(lora_dir)
+    peft_model.load_adapter(lora_dir, adapter_name="default")
     return peft_model
