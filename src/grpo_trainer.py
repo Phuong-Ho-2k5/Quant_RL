@@ -99,7 +99,6 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         
         num_generations=2,
         temperature=0.9,
-        max_prompt_length=128,
         max_completion_length=128,
         beta=0.04,
         fp16=False,

@@ -13,7 +13,7 @@ def get_t4_bnb_config():
 def apply_lora_for_llava(model_path):
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.float32,
+        bnb_4bit_compute_dtype=torch.float16,
         bnb_4bit_quant_type="nf4",
         bnb_4bit_use_double_quant=True
     )
@@ -21,7 +21,7 @@ def apply_lora_for_llava(model_path):
     model = LlavaForConditionalGeneration.from_pretrained(
         model_path,
         quantization_config=bnb_config,
-        torch_dtype=torch.float32,
+        torch_dtype=torch.float16,
         device_map="auto",
     )
     
