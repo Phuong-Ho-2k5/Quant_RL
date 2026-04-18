@@ -94,6 +94,13 @@ def run_rl_pipeline(quant_model_dir, sft_dataset, grpo_dataset):
     #     print(f"\n[SUCCESS] Hoàn tất SFT!")
 
     # Bước GRPO: Tối ưu khả năng suy luận
+    import gc
+    import torch
+    gc.collect()
+    torch.cuda.empty_cache()
+    
+    import time
+    time.sleep(2)
     print("\n--- 6. Bắt đầu huấn luyện RL (GRPO) ---")
     train_llava_grpo(quant_model_dir, grpo_dataset, grpo_output_dir, sft_lora_dir=None)
     print(f"\n[SUCCESS] Hoàn tất GRPO!")
