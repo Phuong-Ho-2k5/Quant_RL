@@ -83,19 +83,19 @@ def run_rl_pipeline(quant_model_dir, sft_dataset, grpo_dataset):
     grpo_output_dir = "./r3_quant_checkpoints"
     
     # Bước SFT: Dạy format XML cho Llava
-    checkpoint_exists = os.path.exists(sft_output_dir) and \
-                        os.path.exists(os.path.join(sft_output_dir, "adapter_config.json"))
+    # checkpoint_exists = os.path.exists(sft_output_dir) and \
+    #                     os.path.exists(os.path.join(sft_output_dir, "adapter_config.json"))
 
-    if checkpoint_exists:
-        print(f"\n--- [SKIP] Đã tìm thấy SFT Checkpoint. ---")
-    else:
-        print("\n--- 5. Bắt đầu SFT (Supervised Fine-Tuning) ---")
-        train_llava_sft(quant_model_dir, sft_dataset, sft_output_dir)
-        print(f"\n[SUCCESS] Hoàn tất SFT!")
+    # if checkpoint_exists:
+    #     print(f"\n--- [SKIP] Đã tìm thấy SFT Checkpoint. ---")
+    # else:
+    #     print("\n--- 5. Bắt đầu SFT (Supervised Fine-Tuning) ---")
+    #     train_llava_sft(quant_model_dir, sft_dataset, sft_output_dir)
+    #     print(f"\n[SUCCESS] Hoàn tất SFT!")
 
     # Bước GRPO: Tối ưu khả năng suy luận
     print("\n--- 6. Bắt đầu huấn luyện RL (GRPO) ---")
-    train_llava_grpo(quant_model_dir, grpo_dataset, grpo_output_dir, sft_lora_dir=sft_output_dir)
+    train_llava_grpo(quant_model_dir, grpo_dataset, grpo_output_dir, sft_lora_dir=None)
     print(f"\n[SUCCESS] Hoàn tất GRPO!")
 
 def main():

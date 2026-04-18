@@ -52,20 +52,24 @@ def prepare_minicap_for_sft(raw_dataset, max_samples=None):
     return dataset
 
 def prepare_scienceqa_for_grpo(raw_dataset, max_samples=None):
-    """
-    Chuẩn bị dữ liệu cho GRPO. GRPO cần cột 'prompt' (đầu vào) 
-    và 'ground_truth' (để hàm reward so sánh).
-    """
     labels = ["A", "B", "C", "D", "E"]
 
     def format_row(item):
         question_text = build_scienceqa_prompt(item['question'], item['choices'])
         
-        # Với Llava trong GRPOTrainer, ta dùng format string để tránh lỗi template
-        prompt_text = f"USER: <image>\n{question_text}\nThink step by step. Output reasoning in <think> and final letter in <answer>.\nASSISTANT:"
+        # SỬA LẠI: Chuyển sang định dạng list of dicts (Conversational)
+        prompt_conversational = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image"}, # Giữ chỗ cho hình ảnh
+                    {"type": "text", "text": f"{question_text}\nThink step by step. Output reasoning in <think> and final letter in <answer>."}
+                ],
+            }
+        ]
         
         return {
-            "prompt": prompt_text,
+            "prompt": prompt_conversational, # Định dạng hội thoại chuẩn
             "images": [item['image']],  
             "ground_truth": labels[item['answer']]
         }
