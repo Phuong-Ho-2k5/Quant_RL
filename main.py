@@ -9,6 +9,7 @@ from model.quantizer import LlavaGPTQQuantizer
 from src.grpo_trainer import train_llava_grpo 
 from src.sft_trainer import train_llava_sft
 
+os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 # 1. Cấu hình Model Llava-7B
 BASE_MODEL_ID = "llava-hf/llava-1.5-7b-hf"
 QUANT_BITS = 4

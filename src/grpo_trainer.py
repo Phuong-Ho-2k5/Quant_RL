@@ -29,7 +29,7 @@ def logging_reward_func(prompts, completions, **kwargs):
 
 def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: str = None):
     # Ép buộc torch về fp32 để tránh mixed precision
-    torch.set_default_dtype(torch.float32)
+    torch.set_default_dtype(torch.float16)
     
     # 1. Load Processor chuẩn Llava
     processor = AutoProcessor.from_pretrained(model_dir)
@@ -99,7 +99,8 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         
         num_generations=2,
         temperature=0.9,
-        max_completion_length=256,
+        max_prompt_length=128,
+        max_completion_length=128,
         beta=0.04,
         fp16=False,
         bf16=False,

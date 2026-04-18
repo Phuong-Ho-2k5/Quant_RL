@@ -53,7 +53,7 @@ class SFTVisualizerCallback(TrainerCallback):
             model.train()
 
 def train_llava_sft(model_dir: str, train_data, output_dir: str):
-    torch.set_default_dtype(torch.float32)
+    torch.set_default_dtype(torch.float16)
     
     processor = AutoProcessor.from_pretrained(model_dir)
     peft_model = apply_lora_for_llava(model_dir)
