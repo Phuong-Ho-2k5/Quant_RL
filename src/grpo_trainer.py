@@ -97,9 +97,9 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         gradient_accumulation_steps=16,
         gradient_checkpointing=True,
         
-        num_generations=4,
+        num_generations=2,
         temperature=0.9,
-        max_completion_length=512,
+        max_completion_length=256,
         beta=0.04,
         fp16=False,
         bf16=False,
