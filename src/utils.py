@@ -53,9 +53,13 @@ def prepare_minicap_for_sft(raw_dataset, max_samples=None):
 
 def prepare_scienceqa_for_grpo(raw_dataset, max_samples=None):
     labels = ["A", "B", "C", "D", "E"]
+    MAX_PROMPT_TEXT_LENGTH = 512
 
     def format_row(item):
         question_text = build_scienceqa_prompt(item['question'], item['choices'])
+
+        if len(question_text) > MAX_PROMPT_TEXT_LENGTH:
+            question_text = question_text[:MAX_PROMPT_TEXT_LENGTH] + "..."
         
         # SỬA LẠI: Chuyển sang định dạng list of dicts (Conversational)
         prompt_conversational = [
