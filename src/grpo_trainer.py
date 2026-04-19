@@ -91,8 +91,8 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         learning_rate=5e-6,
         optim="adamw_8bit",
         lr_scheduler_type="cosine",
-        max_steps=500,
-        save_steps=50,
+        max_steps=1,
+        # save_steps=50,
         per_device_train_batch_size=1,
         gradient_accumulation_steps=16,
         gradient_checkpointing=True,
@@ -101,13 +101,14 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         temperature=0.9,
         max_completion_length=128,
         beta=0.04,
-        fp16=False,
+        fp16=True,
         bf16=False,
         tf32=False,
         remove_unused_columns=False,
         report_to="none",
         dataloader_pin_memory=False,
         skip_memory_metrics=True,
+        use_vllm=False
     )
 
     trainer = GRPOTrainer(
