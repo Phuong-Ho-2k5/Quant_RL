@@ -46,8 +46,6 @@ class LlavaGPTQQuantizer:
             # Quantize model
             quantized_model = quantizer.quantize_model(
                 model,
-                tokenizer=None,  # Will be loaded from model
-                max_memory=None,
             )
             
             # Save quantized model
