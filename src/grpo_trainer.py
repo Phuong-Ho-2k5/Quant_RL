@@ -11,7 +11,7 @@ from trl import GRPOConfig, GRPOTrainer
 from transformers import AutoProcessor, LlavaForConditionalGeneration
 from model.lora_setup import apply_lora_for_llava, load_existing_lora_for_quantized_model
 from src.rewards import format_reward_func, accuracy_reward_func
-from utils import prepare_scienceqa_for_grpo 
+from src.utils import prepare_scienceqa_for_grpo 
 
 def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: str = None):
     """Train Llava với GRPO"""

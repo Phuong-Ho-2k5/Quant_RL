@@ -8,7 +8,7 @@ from trl import SFTConfig, SFTTrainer
 from transformers import AutoProcessor, TrainerCallback
 from accelerate import Accelerator
 from model.lora_setup import apply_lora_for_llava 
-from utils import prepare_minicap_for_sft
+from src.utils import prepare_minicap_for_sft
 
 class SFTVisualizerCallback(TrainerCallback):
     def __init__(self, processor, dataset, sample_every=20):
