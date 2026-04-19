@@ -10,7 +10,7 @@ from PIL import Image
 from trl import GRPOConfig, GRPOTrainer
 from transformers import AutoProcessor, LlavaForConditionalGeneration
 from model.lora_setup import apply_lora_for_llava, load_existing_lora_for_quantized_model
-from rewards import format_reward_func, accuracy_reward_func
+from src.rewards import format_reward_func, accuracy_reward_func
 from utils import prepare_scienceqa_for_grpo 
 
 def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: str = None):
@@ -46,7 +46,7 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         output_dir=output_dir,
         learning_rate=5e-6,
         optim="adamw_torch",
-        max_steps=1,  # Tăng lên từ 1
+        max_steps=1, 
         per_device_train_batch_size=1,
         gradient_accumulation_steps=4,
         gradient_checkpointing=True,
