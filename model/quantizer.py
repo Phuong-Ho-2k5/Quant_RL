@@ -1,12 +1,8 @@
 import sys
 import os
 import torch
-from transformers import (
-    AutoProcessor, 
-    LlavaForConditionalGeneration,
-    AutoConfig,
-    GPTQConfig
-)
+import gc
+from transformers import AutoProcessor, LlavaForConditionalGeneration, GPTQConfig, AutoConfig
 from data.dataset_loader import ScienceQALocalLoader 
 
 class LlavaGPTQQuantizer:
@@ -16,54 +12,49 @@ class LlavaGPTQQuantizer:
         self.data_path = data_path
 
     def quantize_and_save(self, bits=3):
-        print(f"--- 🛠️ Đang cấu hình nén {bits}-bit (GPTQ) cho riêng LLM... ---")
+        # Dọn dẹp VRAM trước khi bắt đầu
+        gc.collect()
+        torch.cuda.empty_cache()
         
-        # 1. Chuẩn bị dữ liệu Calibration (128 mẫu là tối ưu cho T4)
-        loader = ScienceQALocalLoader(self.data_path, subset_size=128)
-        df_samples = loader.preprocess_for_r3_quant()
+        print(f"--- 🛠️ Nén 3-bit: Chế độ Siêu tiết kiệm VRAM cho 2xT4 ---")
+        
+        processor = AutoProcessor.from_pretrained(self.base_model_path)
+        loader = ScienceQALocalLoader(self.data_path, subset_size=16)
         calibration_dataset = [
-            f"Question: {row['question']} Answer: {row['reasoning']}"[:512] 
-            for _, row in df_samples.iterrows()
+            f"Q: {row['question']} A: {row['reasoning']}"[:256] 
+            for _, row in loader.preprocess_for_r3_quant().iterrows()
         ]
 
-        # 2. Cấu hình GPTQ chỉ nhắm vào LLM
         quantization_config = GPTQConfig(
             bits=bits,
             dataset=calibration_dataset,
             tokenizer=self.base_model_path,
-            # QUAN TRỌNG: Không nén phần nhìn và projector
-            modules_to_not_convert=["vision_tower", "multi_modal_projector"], 
+            modules_to_not_convert=["vision_tower", "multi_modal_projector"],
+            model_seqlen=256, # GIẢM XUỐNG 256: Đây là chìa khóa để thoát OOM
             desc_act=False,
             sym=True,
-            model_seqlen=512 # Tiết kiệm bộ nhớ trong lúc nén
         )
 
         try:
-            # Bypass lỗi AttributeError của optimum trên Llava
             config = AutoConfig.from_pretrained(self.base_model_path)
             config.use_cache = False 
 
-            print(f"--- ⏳ Đang nạp model lên CPU để nén (Tránh OOM T4)... ---")
+            print(f"--- ⏳ Đang nạp model lên CPU (Offloading mode)... ---")
             model = LlavaForConditionalGeneration.from_pretrained(
                 self.base_model_path,
                 config=config,
                 quantization_config=quantization_config,
-                device_map="cpu", # Nạp RAM trước khi đẩy từng layer lên GPU nén
+                # BUỘC DÙNG cpu để dành toàn bộ 15GB VRAM cho việc tính ma trận Hessian
+                device_map="cpu", 
                 torch_dtype=torch.float16,
                 low_cpu_mem_usage=True
             )
 
             os.makedirs(self.save_path, exist_ok=True)
-            print(f"--- 💾 Đang lưu model tại: {self.save_path} ---")
             model.save_pretrained(self.save_path)
-            
-            processor = AutoProcessor.from_pretrained(self.base_model_path)
             processor.save_pretrained(self.save_path)
-            
-            print(f"--- ✅ [SUCCESS] Đã lưu model GPTQ 3-bit thành công! ---")
+            print(f"--- ✅ [SUCCESS] Đã vượt qua block 32/32! ---")
             
         except Exception as e:
-            print(f"--- ❌ Lỗi nghiêm trọng: {e} ---")
-            import traceback
-            traceback.print_exc()
+            print(f"--- ❌ Lỗi: {e} ---")
             sys.exit(1)
