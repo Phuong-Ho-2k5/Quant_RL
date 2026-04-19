@@ -1,5 +1,7 @@
 import torch
 from datasets import Dataset
+from PIL import Image
+import io
 
 def build_scienceqa_prompt(question: str, choices: list) -> str:
     """Xây dựng nội dung câu hỏi và các lựa chọn."""
@@ -10,77 +12,92 @@ def build_scienceqa_prompt(question: str, choices: list) -> str:
         return prompt
 
     for i, choice in enumerate(choices):
-        prompt += f"{labels[i]}. {choice}\n"
+        if i < len(labels):
+            prompt += f"{labels[i]}. {choice}\n"
         
     return prompt
 
 def prepare_minicap_for_sft(raw_dataset, max_samples=None):
-    """
-    Chuẩn bị dữ liệu cho SFT. Đối với Llava-7B, chúng ta cần gộp 
-    thành một cột 'text' hoàn chỉnh bao gồm cả Prompt và Label.
-    """
+    """Chuẩn bị dữ liệu cho SFT"""
     SYSTEM_PROMPT = (
         "A conversation between a user and an AI assistant. The assistant "
         "thinks step-by-step and encloses the reasoning in <think> tags "
         "and the final answer in <answer> tags."
     )
-    old_column_names = raw_dataset.column_names 
+    
     def format_sft_row(item):
-        # Format chuẩn Llava: USER: <image>\n{Question} ASSISTANT: <think>{Reasoning}</think><answer>{Answer}</answer>
         question_text = build_scienceqa_prompt(item.get("question", ""), item.get("choices", []))
         
-        # Giả sử dataset của bạn có cột 'solution' hoặc 'reasoning' cho phần CoT
         solution = item.get("solution", item.get("reasoning", ""))
-        answer_letter = ["A", "B", "C", "D", "E"][item.get("answer", 0)]
+        answer_idx = item.get("answer", 0)
+        answer_letter = ["A", "B", "C", "D", "E"][answer_idx] if isinstance(answer_idx, int) and 0 <= answer_idx < 5 else "A"
         
-        # Tạo chuỗi text hoàn chỉnh cho SFT Trainer
         full_text = (
-            f"USER: <image>\n{question_text}\n{SYSTEM_PROMPT}\n"
+            f"USER: <table>\n{question_text}\n\n{SYSTEM_PROMPT}\n"
             f"ASSISTANT: <think>{solution}</think><answer>{answer_letter}</answer>"
         )
         
+        # Xử lý image
+        image = item.get("image")
+        if image is None:
+            return None
+            
         return {
             "text": full_text,
-            "images": [item["image"]] 
+            "images": [image]
         }
 
+    # Filter valid rows
     dataset = raw_dataset.filter(lambda x: x.get("image") is not None)
+    
     if max_samples:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
-
-    dataset = dataset.map(format_sft_row, num_proc=1, remove_columns=old_column_names)
+    
+    # Apply formatting
+    dataset = dataset.map(format_sft_row, num_proc=1, remove_columns=raw_dataset.column_names)
+    
+    # Remove None values
+    dataset = dataset.filter(lambda x: x is not None)
+    
     return dataset
 
 def prepare_scienceqa_for_grpo(raw_dataset, max_samples=None):
+    """Chuẩn bị dữ liệu cho GRPO"""
     labels = ["A", "B", "C", "D", "E"]
     MAX_PROMPT_TEXT_LENGTH = 512
 
     def format_row(item):
-        question_text = build_scienceqa_prompt(item['question'], item['choices'])
+        question_text = build_scienceqa_prompt(item.get('question', ''), item.get('choices', []))
 
         if len(question_text) > MAX_PROMPT_TEXT_LENGTH:
             question_text = question_text[:MAX_PROMPT_TEXT_LENGTH] + "..."
         
-        # SỬA LẠI: Chuyển sang định dạng list of dicts (Conversational)
+        # Format cho conversational model
         prompt_conversational = [
             {
                 "role": "user",
                 "content": [
-                    {"type": "image"}, # Giữ chỗ cho hình ảnh
+                    {"type": "image"},
                     {"type": "text", "text": f"{question_text}\nThink step by step. Output reasoning in <think> and final letter in <answer>."}
                 ],
             }
         ]
         
+        answer_idx = item.get('answer', 0)
+        ground_truth = labels[answer_idx] if isinstance(answer_idx, int) and 0 <= answer_idx < 5 else "A"
+        
         return {
-            "prompt": prompt_conversational, # Định dạng hội thoại chuẩn
-            "images": [item['image']],  
-            "ground_truth": labels[item['answer']]
+            "prompt": prompt_conversational,
+            "images": [item.get('image')] if item.get('image') is not None else [],
+            "ground_truth": ground_truth
         }
 
+    # Filter rows with images
     dataset = raw_dataset.filter(lambda x: x.get('image') is not None)
+    
     if max_samples:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
         
-    dataset = dataset.map(format_row, num_proc=4) 
+    dataset = dataset.map(format_row, num_proc=1)
+    
     return dataset

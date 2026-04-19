@@ -5,11 +5,8 @@ import random
 from trl import SFTConfig, SFTTrainer
 from transformers import AutoProcessor, TrainerCallback
 from accelerate import Accelerator
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from model.lora_setup import apply_lora_for_llava 
-from src.utils import prepare_minicap_for_sft
+from lora_setup import apply_lora_for_llava 
+from utils import prepare_minicap_for_sft
 
 class SFTVisualizerCallback(TrainerCallback):
     def __init__(self, processor, dataset, sample_every=20):
@@ -25,8 +22,13 @@ class SFTVisualizerCallback(TrainerCallback):
             idx = random.randint(0, len(self.dataset) - 1)
             item = self.dataset[idx]
             
-            full_text = item["text"]
-            image = item["images"][0]
+            full_text = item.get("text", "")
+            images = item.get("images", [])
+            
+            if not images:
+                return
+                
+            image = images[0]
 
             if "ASSISTANT:" in full_text:
                 prompt_text = full_text.split("ASSISTANT:")[0] + "ASSISTANT:"
@@ -35,11 +37,12 @@ class SFTVisualizerCallback(TrainerCallback):
                 prompt_text = full_text[:100]
                 ground_truth = "N/A"
                 
-            inputs = self.processor(text=prompt_text, images=image, return_tensors="pt").to(model.device)
+            inputs = self.processor(text=prompt_text, images=image, return_tensors="pt")
+            inputs = {k: v.to(model.device) for k, v in inputs.items()}
 
             with torch.no_grad():
                 generated_ids = model.generate(**inputs, max_new_tokens=256)
-                generated_ids_trimmed = generated_ids[:, inputs.input_ids.shape[1]:]
+                generated_ids_trimmed = generated_ids[:, inputs['input_ids'].shape[1]:]
                 output_text = self.processor.batch_decode(
                     generated_ids_trimmed, skip_special_tokens=True
                 )[0]
@@ -53,45 +56,46 @@ class SFTVisualizerCallback(TrainerCallback):
             model.train()
 
 def train_llava_sft(model_dir: str, train_data, output_dir: str):
-    torch.set_default_dtype(torch.float16)
+    """Train Llava với SFT"""
     
+    # Check GPU
+    if torch.cuda.is_available():
+        torch.set_default_dtype(torch.float16)
+    
+    # Load processor
     processor = AutoProcessor.from_pretrained(model_dir)
-    peft_model = apply_lora_for_llava(model_dir)
+    if hasattr(processor, 'tokenizer') and processor.tokenizer:
+        processor.tokenizer.padding_side = "right"
+        processor.tokenizer.pad_token = processor.tokenizer.eos_token
     
-    for param in peft_model.parameters():
-        if param.is_floating_point():
-            param.data = param.data.float()
+    # Load model
+    peft_model = apply_lora_for_llava(model_dir, use_4bit=True)
+    peft_model.config.use_cache = False
     
-    sft_dataset = prepare_minicap_for_sft(train_data) 
-
-    accelerator = Accelerator(
-        mixed_precision="no",
-        gradient_accumulation_steps=8
-    )
+    # Prepare dataset
+    sft_dataset = prepare_minicap_for_sft(train_data, max_samples=1000)
     
+    # Training config
     training_args = SFTConfig(
         output_dir=output_dir,
         dataset_text_field="text",
-        learning_rate=2e-5,          
+        learning_rate=2e-5,
         lr_scheduler_type="cosine",
-        # logging_steps=5,           
-        max_steps=1, 
-        per_device_train_batch_size=1, 
-        gradient_accumulation_steps=8,
-        gradient_checkpointing=True, 
-        fp16=False,
+        max_steps=500,
+        per_device_train_batch_size=1,
+        gradient_accumulation_steps=4,
+        gradient_checkpointing=True,
+        fp16=torch.cuda.is_available(),
         bf16=False,
-        tf32=False,
-        remove_unused_columns=False, 
+        remove_unused_columns=False,
         report_to="none",
-        # Thêm các flags quan trọng
         dataloader_pin_memory=False,
-        skip_memory_metrics=True,
+        logging_steps=10,
+        save_steps=100,
     )
     
-    peft_model.config.use_cache = False
-    
-    visualizer = SFTVisualizerCallback(processor, sft_dataset, sample_every=25)
+    # Callback
+    visualizer = SFTVisualizerCallback(processor, sft_dataset, sample_every=50)
 
     trainer = SFTTrainer(
         model=peft_model,
@@ -100,11 +104,10 @@ def train_llava_sft(model_dir: str, train_data, output_dir: str):
         train_dataset=sft_dataset,
         callbacks=[visualizer],
     )
-    
-    trainer.accelerator = accelerator
 
     print("--- Bắt đầu huấn luyện SFT cho Llava-7B ---")
     trainer.train()
     
     trainer.save_model(output_dir)
     processor.save_pretrained(output_dir)
+    print(f"✅ Đã lưu model tại {output_dir}")
