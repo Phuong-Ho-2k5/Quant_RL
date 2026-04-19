@@ -7,8 +7,8 @@ from datasets import load_dataset
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
 from model.quantizer import LlavaGPTQQuantizer 
-from grpo_trainer import train_llava_grpo 
-from sft_trainer import train_llava_sft
+from src.grpo_trainer import train_llava_grpo 
+from src.sft_trainer import train_llava_sft
 from data.dataset_loader import ScienceQALocalLoader
 
 os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
