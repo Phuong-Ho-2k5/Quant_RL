@@ -25,6 +25,7 @@ class LlavaGPTQQuantizer:
                 for _, row in df_samples.iterrows()
             ]
             
+            tokenizer = AutoProcessor.from_pretrained(self.base_model_path)
             # Khởi tạo GPTQ quantizer
             quantizer = GPTQQuantizer(
                 bits=bits,
@@ -46,9 +47,9 @@ class LlavaGPTQQuantizer:
             if not hasattr(model.config, 'use_cache'):
                 print("🔧 Adding use_cache attribute to config...")
                 model.config.use_cache = False
-                
+
             # Quantize model
-            quantized_model = quantizer.quantize_model(model)
+            quantized_model = quantizer.quantize_model(model, tokenizer = tokenizer)
             
             # Save quantized model
             os.makedirs(self.save_path, exist_ok=True)
@@ -57,6 +58,9 @@ class LlavaGPTQQuantizer:
             # Save processor
             processor = AutoProcessor.from_pretrained(self.base_model_path)
             processor.save_pretrained(self.save_path)
+            
+            # Save tokenizer
+            tokenizer.save_pretrained(self.save_path)
             
             print(f"--- ✅ [SUCCESS] Đã lưu model GPTQ {bits}-bit tại: {self.save_path} ---")
             
