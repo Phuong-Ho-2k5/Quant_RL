@@ -43,6 +43,10 @@ class LlavaGPTQQuantizer:
                 low_cpu_mem_usage=True
             )
             
+            if not hasattr(model.config, 'use_cache'):
+                print("🔧 Adding use_cache attribute to config...")
+                model.config.use_cache = False
+                
             # Quantize model
             quantized_model = quantizer.quantize_model(model)
             
