@@ -1,5 +1,11 @@
 import os
 import sys
+
+os.environ["WANDB_DISABLED"] = "true"
+os.environ["WANDB_MODE"] = "disabled"
+os.environ["DISABLE_WANDB"] = "1"
+os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
+
 from huggingface_hub import snapshot_download
 from datasets import load_dataset
 

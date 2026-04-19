@@ -1,5 +1,7 @@
 import os
 os.environ["WANDB_DISABLED"] = "true"
+os.environ["WANDB_MODE"] = "disabled"
+os.environ["DISABLE_WANDB"] = "1"
 
 import torch
 import sys
