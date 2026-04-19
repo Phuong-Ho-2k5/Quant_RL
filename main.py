@@ -6,15 +6,15 @@ from datasets import load_dataset
 # Add paths
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
-from quantizer import LlavaGPTQQuantizer 
+from model.quantizer import LlavaGPTQQuantizer 
 from grpo_trainer import train_llava_grpo 
 from sft_trainer import train_llava_sft
-from dataset_loader import ScienceQALocalLoader
+from data.dataset_loader import ScienceQALocalLoader
 
 os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 
 BASE_MODEL_ID = "llava-hf/llava-1.5-7b-hf"
-QUANT_BITS = 4  # Changed to 4-bit for better compatibility
+QUANT_BITS = 3  # Changed to 4-bit for better compatibility
 
 def setup_environment():
     print("--- 1. Khởi tạo cấu trúc thư mục ---")

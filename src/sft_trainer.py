@@ -5,7 +5,7 @@ import random
 from trl import SFTConfig, SFTTrainer
 from transformers import AutoProcessor, TrainerCallback
 from accelerate import Accelerator
-from lora_setup import apply_lora_for_llava 
+from model.lora_setup import apply_lora_for_llava 
 from utils import prepare_minicap_for_sft
 
 class SFTVisualizerCallback(TrainerCallback):

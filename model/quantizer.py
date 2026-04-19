@@ -3,7 +3,7 @@ import os
 import torch
 from transformers import AutoProcessor, LlavaForConditionalGeneration
 from optimum.gptq import GPTQQuantizer
-from dataset_loader import ScienceQALocalLoader 
+from data.dataset_loader import ScienceQALocalLoader 
 
 class LlavaGPTQQuantizer:
     def __init__(self, base_model_path, save_path, data_path):
