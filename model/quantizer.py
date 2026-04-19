@@ -44,9 +44,7 @@ class LlavaGPTQQuantizer:
             )
             
             # Quantize model
-            quantized_model = quantizer.quantize_model(
-                model,
-            )
+            quantized_model = quantizer.quantize_model(model)
             
             # Save quantized model
             os.makedirs(self.save_path, exist_ok=True)
