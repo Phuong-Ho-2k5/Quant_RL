@@ -1,8 +1,8 @@
+import sys
+import os
 os.environ["WANDB_DISABLED"] = "true"
 os.environ["WANDB_MODE"] = "disabled"
 import torch
-import sys
-import os
 import random
 from trl import SFTConfig, SFTTrainer
 from transformers import AutoProcessor, TrainerCallback
