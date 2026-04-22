@@ -48,7 +48,7 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         output_dir=output_dir,
         learning_rate=5e-6,
         optim="adamw_8bit",
-        max_steps=1,
+        max_steps=200,
         per_device_train_batch_size=1,
         gradient_accumulation_steps=8,
         gradient_checkpointing=True,
