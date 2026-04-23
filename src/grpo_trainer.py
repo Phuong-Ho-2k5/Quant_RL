@@ -71,7 +71,6 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         reward_funcs=[format_reward_func, accuracy_reward_func],
         args=training_args,
         train_dataset=grpo_dataset,
-        data_collator=None,
     )
     
     print("--- 🚀 Bắt đầu huấn luyện GRPO cho Llava-7B ---")
