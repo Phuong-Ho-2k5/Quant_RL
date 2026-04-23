@@ -30,7 +30,7 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         if processor.tokenizer.pad_token is None:
             processor.tokenizer.pad_token = processor.tokenizer.eos_token
     
-    # 3. Load model (FIX LỖI: Bỏ tham số use_4bit)
+    # 3. Load model
     if sft_lora_dir and os.path.exists(sft_lora_dir):
         print(f"🔄 Đang nạp Adapter từ SFT: {sft_lora_dir}")
         peft_model = load_existing_lora_for_quantized_model(model_dir, sft_lora_dir)
@@ -40,22 +40,57 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
 
     peft_model.config.use_cache = False
     
-    # 4. Hàm chuyển đổi dataset sang conversational format
+    # 4. Chuẩn bị dataset (format USER: <td>\n{Q} ASSISTANT:)
+    grpo_dataset = prepare_scienceqa_for_grpo(train_data)
+    
+    # 5. Kiểm tra cấu trúc dataset
+    print("📊 Kiểm tra cấu trúc dataset:")
+    print(f"   Columns: {grpo_dataset.column_names}")
+    if len(grpo_dataset) > 0:
+        print(f"   Sample 0 keys: {grpo_dataset[0].keys()}")
+    
+    # 6. Hàm chuyển đổi dataset sang conversational format (FIX LỖI)
     def convert_to_conversation(example):
         """Chuyển mỗi example sang định dạng hội thoại"""
         
+        # Kiểm tra và lấy choices từ các trường khác nhau
+        if 'choices' in example:
+            choices = example['choices']
+        elif 'options' in example:
+            choices = example['options']
+        elif 'answer_options' in example:
+            choices = example['answer_options']
+        else:
+            # Nếu không có choices, tạo từ question hoặc dùng mặc định
+            print(f"⚠️ Warning: No choices found in example, using default")
+            choices = ["A", "B", "C", "D", "E"]
+        
         # Format choices
-        choices_str = "\n".join([f"{chr(65+i)}. {c}" for i, c in enumerate(example['choices'])])
+        choices_str = "\n".join([f"{chr(65+i)}. {c}" for i, c in enumerate(choices)])
+        
+        # Lấy câu hỏi
+        question = example.get('question', example.get('prompt', 'What is the answer?'))
+        
+        # Lấy đáp án
+        answer_map = {0: "A", 1: "B", 2: "C", 3: "D", 4: "E"}
+        if 'answer' in example:
+            answer_val = example['answer']
+            if isinstance(answer_val, int):
+                answer = answer_map.get(answer_val, "A")
+            else:
+                answer = str(answer_val).upper()
+        elif 'label' in example:
+            answer = str(example['label']).upper()
+        else:
+            answer = "A"
         
         # User prompt với ảnh
         user_content = [
             {"type": "image"},
-            {"type": "text", "text": f"Question: {example['question']}\nChoices:\n{choices_str}\nThink step by step and provide the answer in <answer> tag."}
+            {"type": "text", "text": f"Question: {question}\nChoices:\n{choices_str}\nThink step by step and provide the answer in <answer> tag."}
         ]
         
-        # Assistant response (lấy đáp án đúng)
-        answer_map = {0: "A", 1: "B", 2: "C", 3: "D", 4: "E"}
-        answer = answer_map.get(example['answer'], "A")
+        # Assistant response
         assistant_content = f"<answer>{answer}</answer>"
         
         # Tạo conversation
@@ -64,29 +99,49 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
             {"role": "assistant", "content": assistant_content}
         ]
         
-        return {
-            "conversations": conversation,
-            "image": example['image']  # Giữ nguyên ảnh
-        }
+        # Giữ nguyên ảnh nếu có
+        result = {"conversations": conversation}
+        if 'image' in example:
+            result['image'] = example['image']
+        
+        return result
     
-    # 5. Chuẩn bị dataset (format USER: <tr>\n{Q} ASSISTANT:)
-    grpo_dataset = prepare_scienceqa_for_grpo(train_data)
-    
-    # 6. Chuyển dataset sang conversational format (FIX LỖI GRPO)
+    # 7. Chuyển dataset sang conversational format
     print("🔄 Đang chuyển dataset sang conversational format...")
     
     # Kiểm tra xem dataset đã có cột 'conversations' chưa
     if "conversations" not in grpo_dataset.column_names:
-        # Áp dụng chuyển đổi
-        grpo_dataset = grpo_dataset.map(
-            convert_to_conversation, 
-            remove_columns=grpo_dataset.column_names
-        )
-        print("✅ Đã chuyển đổi dataset thành công!")
+        try:
+            # Thử chuyển đổi với batched=False để dễ debug
+            grpo_dataset = grpo_dataset.map(
+                convert_to_conversation,
+                remove_columns=grpo_dataset.column_names,
+                load_from_cache_file=False
+            )
+            print("✅ Đã chuyển đổi dataset thành công!")
+        except Exception as e:
+            print(f"❌ Lỗi khi chuyển đổi dataset: {e}")
+            print("💡 Thử phương pháp khác...")
+            
+            # Phương pháp dự phòng: tạo dataset mới
+            new_data = []
+            for i, example in enumerate(grpo_dataset):
+                try:
+                    converted = convert_to_conversation(example)
+                    new_data.append(converted)
+                    if i % 100 == 0:
+                        print(f"   Đã xử lý {i}/{len(grpo_dataset)} samples")
+                except Exception as ex:
+                    print(f"   ⚠️ Bỏ qua sample {i}: {ex}")
+                    continue
+            
+            from datasets import Dataset
+            grpo_dataset = Dataset.from_list(new_data)
+            print(f"✅ Đã tạo dataset mới với {len(grpo_dataset)} samples")
     else:
         print("✅ Dataset đã ở định dạng conversational, bỏ qua bước chuyển đổi.")
     
-    # 7. Cấu hình GRPO tối ưu cho 2xT4 Kaggle
+    # 8. Cấu hình GRPO tối ưu cho 2xT4 Kaggle
     training_args = GRPOConfig(
         output_dir=output_dir,
         learning_rate=5e-6,
@@ -107,7 +162,7 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         save_steps=50,
     )
     
-    # 8. Khởi tạo Trainer
+    # 9. Khởi tạo Trainer
     trainer = GRPOTrainer(
         model=peft_model,
         processing_class=processor,
@@ -119,7 +174,7 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
     print("--- 🚀 Bắt đầu huấn luyện GRPO cho Llava-7B ---")
     trainer.train()
     
-    # 9. Lưu kết quả
+    # 10. Lưu kết quả
     trainer.save_model(output_dir)
     processor.save_pretrained(output_dir)
     print(f"✅ Đã lưu model thành công tại {output_dir}")
