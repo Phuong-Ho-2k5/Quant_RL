@@ -59,34 +59,26 @@ def prepare_minicap_for_sft(raw_dataset, max_samples=None):
     return dataset
 
 def prepare_scienceqa_for_grpo(raw_dataset, max_samples=None):
-    """Chuẩn bị dữ liệu cho GRPO"""
     labels = ["A", "B", "C", "D", "E"]
-    MAX_PROMPT_TEXT_LENGTH = 512
 
     def format_row(item):
-        question_text = build_scienceqa_prompt(item.get('question', ''), item.get('choices', []))
-        if len(question_text) > MAX_PROMPT_TEXT_LENGTH:
-            question_text = question_text[:MAX_PROMPT_TEXT_LENGTH] + "..."
-        
-        prompt_conversational = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image"},
-                    {"type": "text", "text": f"{question_text}\nThink step by step. Output reasoning in <think> and final letter in <answer>."}
-                ],
-            }
-        ]
-        
-        answer_idx = item.get('answer', 0)
-        ground_truth = labels[answer_idx] if isinstance(answer_idx, int) and 0 <= answer_idx < 5 else "A"
-        
+        # 1. Xử lý ảnh trước
         image = item.get('image')
         if isinstance(image, dict) and 'bytes' in image:
             image = Image.open(io.BytesIO(image['bytes'])).convert("RGB")
         
+        # 2. Xây dựng prompt text chuẩn Llava 1.5
+        # Lưu ý: Token <image> phải đứng riêng lẻ hoặc theo format model training ban đầu
+        question_text = build_scienceqa_prompt(item.get('question', ''), item.get('choices', []))
+        
+        # Định dạng này giúp Processor dễ dàng map <image> vào vị trí chuẩn
+        prompt = f"USER: <image>\n{question_text}\nThink step by step. Output reasoning in <think> and final letter in <answer>.\nASSISTANT:"
+        
+        answer_idx = item.get('answer', 0)
+        ground_truth = labels[answer_idx] if isinstance(answer_idx, int) and 0 <= answer_idx < 5 else "A"
+        
         return {
-            "prompt": prompt_conversational,
+            "prompt": prompt, # Để dạng String thay vì List dict để tránh lỗi gộp batch của TRL
             "images": [image] if image is not None else [],
             "ground_truth": ground_truth
         }
@@ -94,5 +86,7 @@ def prepare_scienceqa_for_grpo(raw_dataset, max_samples=None):
     dataset = raw_dataset.filter(lambda x: x.get('image') is not None)
     if max_samples:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
-    dataset = dataset.map(format_row, num_proc=1)
+    
+    # Sử dụng remove_columns để làm sạch dataset đầu ra
+    dataset = dataset.map(format_row, remove_columns=raw_dataset.column_names)
     return dataset

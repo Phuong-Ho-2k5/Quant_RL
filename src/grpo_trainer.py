@@ -48,15 +48,15 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         output_dir=output_dir,
         learning_rate=5e-6,
         optim="adamw_8bit",
-        max_steps=200,
+        max_steps=10,
         per_device_train_batch_size=1,
         gradient_accumulation_steps=8,
         gradient_checkpointing=True,
         
         num_generations=2,
-        max_completion_length=128,
+        max_completion_length=1024,
         beta=0.04,
-        
+        dataloader_pin_memory=False,
         fp16=torch.cuda.is_available(),
         report_to="none",
         use_vllm=False,
@@ -71,6 +71,7 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         reward_funcs=[format_reward_func, accuracy_reward_func],
         args=training_args,
         train_dataset=grpo_dataset,
+        data_collator=None,
     )
     
     print("--- 🚀 Bắt đầu huấn luyện GRPO cho Llava-7B ---")
