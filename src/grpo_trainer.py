@@ -13,6 +13,7 @@ from transformers import AutoProcessor
 from model.lora_setup import apply_lora_for_llava, load_existing_lora_for_quantized_model
 from src.rewards import format_reward_func, accuracy_reward_func
 from src.utils import prepare_scienceqa_for_grpo 
+from datasets import Dataset
 
 def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: str = None):
     """Train Llava với GRPO"""
@@ -40,108 +41,62 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
 
     peft_model.config.use_cache = False
     
-    # 4. Chuẩn bị dataset (format USER: <td>\n{Q} ASSISTANT:)
-    grpo_dataset = prepare_scienceqa_for_grpo(train_data)
+    # 4. Tạo dataset từ train_data với format đúng cho GRPO
+    print("🔄 Đang chuẩn bị dataset cho GRPO...")
     
-    # 5. Kiểm tra cấu trúc dataset
-    print("📊 Kiểm tra cấu trúc dataset:")
-    print(f"   Columns: {grpo_dataset.column_names}")
-    if len(grpo_dataset) > 0:
-        print(f"   Sample 0 keys: {grpo_dataset[0].keys()}")
+    grpo_data = []
+    answer_map = {0: "A", 1: "B", 2: "C", 3: "D", 4: "E"}
     
-    # 6. Hàm chuyển đổi dataset sang conversational format (FIX LỖI)
-    def convert_to_conversation(example):
-        """Chuyển mỗi example sang định dạng hội thoại"""
-        
-        # Kiểm tra và lấy choices từ các trường khác nhau
-        if 'choices' in example:
-            choices = example['choices']
-        elif 'options' in example:
-            choices = example['options']
-        elif 'answer_options' in example:
-            choices = example['answer_options']
-        else:
-            # Nếu không có choices, tạo từ question hoặc dùng mặc định
-            print(f"⚠️ Warning: No choices found in example, using default")
-            choices = ["A", "B", "C", "D", "E"]
-        
-        # Format choices
-        choices_str = "\n".join([f"{chr(65+i)}. {c}" for i, c in enumerate(choices)])
-        
-        # Lấy câu hỏi
-        question = example.get('question', example.get('prompt', 'What is the answer?'))
-        
-        # Lấy đáp án
-        answer_map = {0: "A", 1: "B", 2: "C", 3: "D", 4: "E"}
-        if 'answer' in example:
-            answer_val = example['answer']
-            if isinstance(answer_val, int):
-                answer = answer_map.get(answer_val, "A")
-            else:
-                answer = str(answer_val).upper()
-        elif 'label' in example:
-            answer = str(example['label']).upper()
-        else:
-            answer = "A"
-        
-        # User prompt với ảnh
-        user_content = [
-            {"type": "image"},
-            {"type": "text", "text": f"Question: {question}\nChoices:\n{choices_str}\nThink step by step and provide the answer in <answer> tag."}
-        ]
-        
-        # Assistant response
-        assistant_content = f"<answer>{answer}</answer>"
-        
-        # Tạo conversation
-        conversation = [
-            {"role": "user", "content": user_content},
-            {"role": "assistant", "content": assistant_content}
-        ]
-        
-        # Giữ nguyên ảnh nếu có
-        result = {"conversations": conversation}
-        if 'image' in example:
-            result['image'] = example['image']
-        
-        return result
-    
-    # 7. Chuyển dataset sang conversational format
-    print("🔄 Đang chuyển dataset sang conversational format...")
-    
-    # Kiểm tra xem dataset đã có cột 'conversations' chưa
-    if "conversations" not in grpo_dataset.column_names:
+    for idx, example in enumerate(train_data):
         try:
-            # Thử chuyển đổi với batched=False để dễ debug
-            grpo_dataset = grpo_dataset.map(
-                convert_to_conversation,
-                remove_columns=grpo_dataset.column_names,
-                load_from_cache_file=False
-            )
-            print("✅ Đã chuyển đổi dataset thành công!")
+            # Lấy câu hỏi
+            question = example.get('question', '')
+            if not question:
+                question = example.get('prompt', '')
+            
+            # Lấy choices
+            choices = example.get('choices', [])
+            if not choices:
+                choices = example.get('options', ['A', 'B', 'C', 'D'])
+            
+            # Format choices
+            choices_str = "\n".join([f"{chr(65+i)}. {c}" for i, c in enumerate(choices)])
+            
+            # Tạo prompt
+            prompt = f"USER: \nQuestion: {question}\nChoices:\n{choices_str}\nThink step by step and provide the answer in <answer> tag.\nASSISTANT:"
+            
+            # Lấy ground truth
+            answer = example.get('answer', 0)
+            if isinstance(answer, int):
+                answer_letter = answer_map.get(answer, "A")
+            else:
+                answer_letter = str(answer).upper()
+                if len(answer_letter) > 1:
+                    answer_letter = answer_letter[0]
+            
+            ground_truth = f"<answer>{answer_letter}</answer>"
+            
+            grpo_data.append({
+                'prompt': prompt,
+                'ground_truth': ground_truth
+            })
+            
+            # Debug: in sample đầu tiên
+            if idx == 0:
+                print(f"   Sample 0 prompt: {prompt[:150]}...")
+                print(f"   Sample 0 ground_truth: {ground_truth}")
+                
         except Exception as e:
-            print(f"❌ Lỗi khi chuyển đổi dataset: {e}")
-            print("💡 Thử phương pháp khác...")
-            
-            # Phương pháp dự phòng: tạo dataset mới
-            new_data = []
-            for i, example in enumerate(grpo_dataset):
-                try:
-                    converted = convert_to_conversation(example)
-                    new_data.append(converted)
-                    if i % 100 == 0:
-                        print(f"   Đã xử lý {i}/{len(grpo_dataset)} samples")
-                except Exception as ex:
-                    print(f"   ⚠️ Bỏ qua sample {i}: {ex}")
-                    continue
-            
-            from datasets import Dataset
-            grpo_dataset = Dataset.from_list(new_data)
-            print(f"✅ Đã tạo dataset mới với {len(grpo_dataset)} samples")
-    else:
-        print("✅ Dataset đã ở định dạng conversational, bỏ qua bước chuyển đổi.")
+            print(f"⚠️ Lỗi ở sample {idx}: {e}")
+            continue
     
-    # 8. Cấu hình GRPO tối ưu cho 2xT4 Kaggle
+    # Tạo HuggingFace Dataset
+    grpo_dataset = Dataset.from_list(grpo_data)
+    
+    print(f"✅ Dataset ready: {len(grpo_dataset)} samples")
+    print(f"   Columns: {grpo_dataset.column_names}")
+    
+    # 5. Cấu hình GRPO tối ưu cho 2xT4 Kaggle
     training_args = GRPOConfig(
         output_dir=output_dir,
         learning_rate=5e-6,
@@ -162,7 +117,7 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         save_steps=50,
     )
     
-    # 9. Khởi tạo Trainer
+    # 6. Khởi tạo Trainer
     trainer = GRPOTrainer(
         model=peft_model,
         processing_class=processor,
@@ -174,7 +129,7 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
     print("--- 🚀 Bắt đầu huấn luyện GRPO cho Llava-7B ---")
     trainer.train()
     
-    # 10. Lưu kết quả
+    # 7. Lưu kết quả
     trainer.save_model(output_dir)
     processor.save_pretrained(output_dir)
     print(f"✅ Đã lưu model thành công tại {output_dir}")
