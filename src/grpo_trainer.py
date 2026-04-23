@@ -40,10 +40,53 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
 
     peft_model.config.use_cache = False
     
-    # 4. Chuẩn bị dataset (format USER: <image>\n{Q} ASSISTANT:)
+    # 4. Hàm chuyển đổi dataset sang conversational format
+    def convert_to_conversation(example):
+        """Chuyển mỗi example sang định dạng hội thoại"""
+        
+        # Format choices
+        choices_str = "\n".join([f"{chr(65+i)}. {c}" for i, c in enumerate(example['choices'])])
+        
+        # User prompt với ảnh
+        user_content = [
+            {"type": "image"},
+            {"type": "text", "text": f"Question: {example['question']}\nChoices:\n{choices_str}\nThink step by step and provide the answer in <answer> tag."}
+        ]
+        
+        # Assistant response (lấy đáp án đúng)
+        answer_map = {0: "A", 1: "B", 2: "C", 3: "D", 4: "E"}
+        answer = answer_map.get(example['answer'], "A")
+        assistant_content = f"<answer>{answer}</answer>"
+        
+        # Tạo conversation
+        conversation = [
+            {"role": "user", "content": user_content},
+            {"role": "assistant", "content": assistant_content}
+        ]
+        
+        return {
+            "conversations": conversation,
+            "image": example['image']  # Giữ nguyên ảnh
+        }
+    
+    # 5. Chuẩn bị dataset (format USER: <tr>\n{Q} ASSISTANT:)
     grpo_dataset = prepare_scienceqa_for_grpo(train_data)
     
-    # 5. Cấu hình GRPO tối ưu cho 2xT4 Kaggle
+    # 6. Chuyển dataset sang conversational format (FIX LỖI GRPO)
+    print("🔄 Đang chuyển dataset sang conversational format...")
+    
+    # Kiểm tra xem dataset đã có cột 'conversations' chưa
+    if "conversations" not in grpo_dataset.column_names:
+        # Áp dụng chuyển đổi
+        grpo_dataset = grpo_dataset.map(
+            convert_to_conversation, 
+            remove_columns=grpo_dataset.column_names
+        )
+        print("✅ Đã chuyển đổi dataset thành công!")
+    else:
+        print("✅ Dataset đã ở định dạng conversational, bỏ qua bước chuyển đổi.")
+    
+    # 7. Cấu hình GRPO tối ưu cho 2xT4 Kaggle
     training_args = GRPOConfig(
         output_dir=output_dir,
         learning_rate=5e-6,
@@ -64,7 +107,7 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         save_steps=50,
     )
     
-    # 6. Khởi tạo Trainer
+    # 8. Khởi tạo Trainer
     trainer = GRPOTrainer(
         model=peft_model,
         processing_class=processor,
@@ -76,7 +119,7 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
     print("--- 🚀 Bắt đầu huấn luyện GRPO cho Llava-7B ---")
     trainer.train()
     
-    # 7. Lưu kết quả
+    # 9. Lưu kết quả
     trainer.save_model(output_dir)
     processor.save_pretrained(output_dir)
     print(f"✅ Đã lưu model thành công tại {output_dir}")
