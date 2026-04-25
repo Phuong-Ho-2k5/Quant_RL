@@ -41,7 +41,6 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
 
     peft_model.config.use_cache = False
     
-    # 4. Tạo dataset từ train_data với format đúng cho GRPO
     print("🔄 Đang chuẩn bị dataset cho GRPO...")
     
     grpo_data = []
@@ -62,8 +61,13 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
             # Format choices
             choices_str = "\n".join([f"{chr(65+i)}. {c}" for i, c in enumerate(choices)])
             
-            # Tạo prompt
-            prompt = f"USER: \nQuestion: {question}\nChoices:\n{choices_str}\nThink step by step and provide the answer in <answer> tag.\nASSISTANT:"
+            # Tạo prompt - YÊU CẦU THẺ THINK
+            prompt = (
+                f"USER: </td>\nQuestion: {question}\nChoices:\n{choices_str}\n\n"
+                f"Please reason step by step. Put your reasoning inside <think> tags "
+                f"and the final answer letter inside <answer> tags.\n"
+                f"ASSISTANT: <think>"
+            )
             
             # Lấy ground truth
             answer = example.get('answer', 0)
@@ -83,7 +87,7 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
             
             # Debug: in sample đầu tiên
             if idx == 0:
-                print(f"   Sample 0 prompt: {prompt[:150]}...")
+                print(f"   Sample 0 prompt: {prompt[:200]}...")
                 print(f"   Sample 0 ground_truth: {ground_truth}")
                 
         except Exception as e:
@@ -107,7 +111,7 @@ def train_llava_grpo(model_dir: str, train_data, output_dir: str, sft_lora_dir: 
         gradient_checkpointing=True,
         
         num_generations=2,
-        max_completion_length=1024,
+        max_completion_length=256,
         beta=0.04,
         dataloader_pin_memory=False,
         fp16=torch.cuda.is_available(),

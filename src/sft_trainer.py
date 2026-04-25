@@ -34,7 +34,7 @@ def train_llava_sft(model_dir: str, train_data, output_dir: str):
         output_dir=output_dir,
         dataset_text_field="text",
         learning_rate=2e-5,          
-        max_steps=500, 
+        max_steps=1, 
         per_device_train_batch_size=1, 
         gradient_accumulation_steps=8,
         gradient_checkpointing=True, 
